@@ -56,7 +56,6 @@ ob_end_clean();
 
 // 出力のタイプを指定
 header('Content-type: image/png');
-// 画像を出力
 echo $content;
 
 ?>
