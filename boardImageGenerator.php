@@ -9,7 +9,7 @@ define('GD_BASE_SIZE', 700);
 $destinationImage = imagecreatefrompng('imgs/reversi_board.png');
 
 // パラメータから現在の石の配置を取得
-$stones = json_decode(explode('|', $_REQUEST['stones'])[0]);
+$stones = json_decode(explode($_REQUEST['stones']);
 
 //各列をループ
 for($i = 0; $i < count($stones); $i++) {
