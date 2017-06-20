@@ -9,7 +9,7 @@ define('GD_BASE_SIZE', 700);
 $destinationImage = imagecreatefrompng('imgs/reversi_board.png');
 
 // パラメータから現在の石の配置を取得
-$stones = json_decode(explode($_REQUEST['stones']);
+$stones = json_decode($_REQUEST['stones']);
 
 //各列をループ
 for($i = 0; $i < count($stones); $i++) {
@@ -36,9 +36,7 @@ $size = $_REQUEST['size'];
 // ベースサイズと同じなら何もしない
 if($size == GD_BASE_SIZE) {
   $out = $destinationImage;
-}
-// 違うサイズの場合
-else {
+} else {
   // リクエストされたサイズの空の画像を生成
   $out = imagecreatetruecolor($size ,$size);
   // リサイズしながら合成
