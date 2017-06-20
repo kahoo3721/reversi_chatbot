@@ -36,6 +36,7 @@ foreach ($events as $event) {
     error_log('Non text message has come');
     continue;
   }
+  
 
   // ゲーム開始時の石の配置
       $stones =
