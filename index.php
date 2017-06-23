@@ -53,47 +53,44 @@ if(getStonesByUserId($event->getUserId()) === PDO::PARAM_NULL) {
       [0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0],
       ];
-      //ユーザーをデータベースに登録
+      // ユーザーをデータベースに登録
       registerUser($event->getUserId(), json_encode($stones));
-      //Imagemapを返信
-      replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
-      //以降の処理をスキップ
+      // Imagemapを返信
+      replyImagemap($bot, $event->getReplyToken(), '盤面', $stones, null);
+      // 以降の処理をスキップ
       continue;
-  //存在する時
-} else {
-  //データベースから現在の石の配置を取得
-  $stones = getStonesByUserId($event->getUserId());
+    // 存在する時
+    } else {
+      // データベースから現在の石の配置を取得
+      $stones = getStonesByUserId($event->getUserId());
 }
   //imagemapを送信
   replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
 }
 
-//ユーザーをデータベースに登録する
+/// ユーザーをデータベースに登録する
 function registerUser($userId, $stones) {
   $dbh = dbConnection::getConnection();
-  $sql = 'insert into '. TABLE_NAME_STONES .' (userid, stone) values
-    (pgp_sym_encrypt(?, \'' . getenv(
-    'DB_ENCRYPT_PASS') . '\'), ?) ';
+  $sql = 'insert into '. TABLE_NAME_STONES .' (userid, stone) values (pgp_sym_encrypt(?, \'' . getenv('DB_ENCRYPT_PASS') . '\'), ?) ';
   $sth = $dbh->prepare($sql);
   $sth->execute(array($userId, $stones));
 }
 
-//ユーザーIDをもとにデータベースから情報を取得
+// ユーザーIDを元にデータベースから情報を取得
 function getStonesByUserId($userId) {
   $dbh = dbConnection::getConnection();
-  $sql = 'select stone from ' . TABLE_NAME_STONES . ' where ? =
-    pgp_sym_decrypt(userid, \'' .
-    getenv('DB_ENCRYPT_PASS') . '\')';
+  $sql = 'select stone from ' . TABLE_NAME_STONES . ' where ? = pgp_sym_decrypt(userid, \'' . getenv('DB_ENCRYPT_PASS') . '\')';
   $sth = $dbh->prepare($sql);
   $sth->execute(array($userId));
-  //レコードが存在しなければNULL
+  // レコードが存在しなければNULL
   if (!($row = $sth->fetch())) {
     return PDO::PARAM_NULL;
   } else {
-    //石の配置を連想配列に変換して返す
+    // 石の配置を連想配列に変換し返す
     return json_decode($row['stone']);
   }
 }
+
 
 // テキストを返信。引数はLINEBot、返信先、テキスト
 function replyTextMessage($bot, $replyToken, $text) {
@@ -249,32 +246,34 @@ function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
 }
 
 
-//データベースへの接続を管理するクラス
+// データベースへの接続を管理するクラス
 class dbConnection {
-  //インスタンス
+  // インスタンス
   protected static $db;
-  //コンストラクタ
+  // コンストラクタ
   private function __construct() {
 
     try {
-      //環境変数からデータベースへの接続情報を取得
-      $url = parse_url(getenv('DATEBASE_URL'));
-      //データソース
+      // 環境変数からデータベースへの接続情報を取得し
+      $url = parse_url(getenv('DATABASE_URL'));
+      // データソース
       $dsn = sprintf('pgsql:host=%s;dbname=%s', $url['host'], substr($url['path'], 1));
-      //接続を確立
+      // 接続を確立
       self::$db = new PDO($dsn, $url['user'], $url['pass']);
-      //エラー時例外を投げるように設定
-      self::$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-      }
+      // エラー時例外を投げるように設定
+      self::$db->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION );
+    }
     catch (PDOException $e) {
-      echo 'Connection Error: ' . $e->getMessage();
-      }
-    //シングルトン。存在しない場合のみインスタンス化
-    public static function getConnection() {
-      if (!self::$db) {
-        new dbConnection();
-        }
-        return self::$db;
+      error_log('Connection Error: ' . $e->getMessage());
     }
   }
+
+  // シングルトン。存在しない場合のみインスタンス化
+  public static function getConnection() {
+    if (!self::$db) {
+      new dbConnection();
+    }
+    return self::$db;
+  }
+}
 ?>
