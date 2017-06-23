@@ -3,7 +3,7 @@
 // Composerでインストールしたライブラリを一括読み込み
 require_once __DIR__ . '/vendor/autoload.php';
 //テーブル名を定義
-define('TABLE_NAME_STONES', 'stone');
+define('TABLE_NAME_STONES', 'stones');
 // アクセストークンを使いCurlHTTPClientをインスタンス化
 $httpClient = new \LINE\LINEBot\HTTPClient\CurlHTTPClient(getenv('CHANNEL_ACCESS_TOKEN'));
 // CurlHTTPClientとシークレットを使いLINEBotをインスタンス化
@@ -39,7 +39,7 @@ foreach ($events as $event) {
   }
 
 //ユーザーの情報がデータベースに存在しない時
-if(getStonesByUserId($event->getUserId()) === PDO::PARAM_NULL){
+if(getStonesByUserId($event->getUserId()) === PDO::PARAM_NULL) {
 
 // ゲーム開始時の石の配置
       $stones =
@@ -79,15 +79,15 @@ function registerUser($userId, $stones) {
 }
 
 //ユーザーIDをもとにデータベースから情報を取得
-function getStonesByUserId($userId){
+function getStonesByUserId($userId) {
   $dbh = dbConnection::getConnection();
   $sql = 'select stone from ' . TABLE_NAME_STONES . ' where ? =
-   pgp_sym_decrypt(userid, \'' .
-   getenv('DB_ENCRYPT_PASS') . '\')';
+    pgp_sym_decrypt(userid, \'' .
+    getenv('DB_ENCRYPT_PASS') . '\')';
   $sth = $dbh->prepare($sql);
   $sth->execute(array($userId));
   //レコードが存在しなければNULL
-  if (!($row = $sth->fetch())){
+  if (!($row = $sth->fetch())) {
     return PDO::PARAM_NULL;
   } else {
     //石の配置を連想配列に変換して返す
@@ -253,24 +253,24 @@ class dbConnection {
   //インスタンス
   protected static $db;
   //コンストラクタ
-  private function __construct(){
+  private function __construct() {
 
     try {
       //環境変数からデータベースへの接続情報を取得
       $url = parse_url(getenv('DATEBASE_URL'));
       //データソース
-      $dsn = sprintf('pgsql:host=%s;dbname=%s',$url['host'],substr($url['path'],1));
+      $dsn = sprintf('pgsql:host=%s;dbname=%s',$url['host'],substr($url['path'], 1));
       //接続を確立
       self::$db = new PDO($dsn, $url['user'], $url['pass']);
       //エラー時例外を投げるように設定
       self::$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
       }
-    catch (PDOException $e){
+    catch (PDOException $e) {
       echo 'Connection Error: ' . $e->getMessage();
       }
     //シングルトン。存在しない場合のみインスタンス化
-    public static function getConnection(){
-      if (!self::$db){
+    public static function getConnection() {
+      if (!self::$db) {
         new dbConnection();
         }
         return self::$db;
