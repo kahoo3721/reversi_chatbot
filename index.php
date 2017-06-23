@@ -63,10 +63,19 @@ if(getStonesByUserId($event->getUserId()) === PDO::PARAM_NULL) {
     } else {
       // データベースから現在の石の配置を取得
       $stones = getStonesByUserId($event->getUserId());
-}
-  //imagemapを送信
-  replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
-}
+    }
+    //入力されたテキストを[行、列]の配列に変換
+    $tappedArea = json_decode($event->getText());
+
+    // ユーザーの石を置く
+    placeStone($stones, $tappedArea[0] - 1, $tappedArea[1] - 1, true);
+
+    // ユーザーの情報を更新
+    updateUser($event->getUserId(), json_encode($stones));
+
+    //imagemapを送信
+    replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
+ }
 
 /// ユーザーをデータベースに登録する
 function registerUser($userId, $stones) {
@@ -74,6 +83,14 @@ function registerUser($userId, $stones) {
   $sql = 'insert into '. TABLE_NAME_STONES .' (userid, stone) values (pgp_sym_encrypt(?, \'' . getenv('DB_ENCRYPT_PASS') . '\'), ?) ';
   $sth = $dbh->prepare($sql);
   $sth->execute(array($userId, $stones));
+}
+
+// ユーザーの情報を更新
+function updateUser($userId, $stones) {
+  $dbh = dbConnection::getConnection();
+  $sql = 'update ' . TABLE_NAME_STONES . ' set stone = ? where ? = pgp_sym_decrypt(userid, \'' . getenv('DB_ENCRYPT_PASS') . '\')';
+  $sth = $dbh->prepare($sql);
+  $sth->execute(array($stones, $userId));
 }
 
 // ユーザーIDを元にデータベースから情報を取得
@@ -138,7 +155,43 @@ function getFlipCountByPosAndColor($stones, $row, $col, $isWhite)
   // ひっくり返る総数を返す
   return $total;
 }
+// 石を置く。石の配置は参照渡し
+function placeStone(&$stones, $row, $col, $isWhite) {
+  // ひっくり返す。処理の流れは
+  // getFlipCountByPosAndColorとほぼ同じ
+  $directions = [[-1, 0],[-1, 1],[0, 1],[1, 0],[1, 1],[1, 0],[1, -1],[0, -1],[-1, -1]];
 
+  for ($i = 0; $i < count($directions); ++$i) {
+    $cnt = 1;
+    $rowDiff = $directions[$i][0];
+    $colDiff = $directions[$i][1];
+    $flipCount = 0;
+
+    while (true) {
+      if (!isset($stones[$row + $rowDiff * $cnt]) || !isset($stones[$row + $rowDiff * $cnt][$col + $colDiff * $cnt])) {
+        $flipCount = 0;
+        break;
+      }
+      if ($stones[$row + $rowDiff * $cnt][$col + $colDiff * $cnt] == ($isWhite ? 2 : 1)) {
+        $flipCount++;
+      } elseif ($stones[$row + $rowDiff * $cnt][$col + $colDiff * $cnt] == ($isWhite ? 1 : 2)) {
+        if ($flipCount > 0) {
+          // ひっくり返す
+          for ($i = 0; $i < $flipCount; ++$i) {
+            $stones[$row + $rowDiff * ($i + 1)][$col + $colDiff * ($i + 1)] = ($isWhite ? 1 : 2);
+          }
+        }
+        break;
+      } elseif ($stones[$row + $rowDiff * $cnt][$col + $colDiff * $cnt] == 0) {
+        $flipCount = 0;
+        break;
+      }
+      $cnt++;
+    }
+  }
+  // 新たに石を置く
+  $stones[$row][$col] = ($isWhite ? 1 : 2);
+}
 
 // テキストを返信。引数はLINEBot、返信先、テキスト
 function replyTextMessage($bot, $replyToken, $text) {
