@@ -51,8 +51,9 @@ foreach ($events as $event) {
       [0, 0, 0, 0, 0, 0, 0, 0],
       ];
 
-  //imagema
+  //imagemapを送信
   replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
+}
 
 // テキストを返信。引数はLINEBot、返信先、テキスト
 function replyTextMessage($bot, $replyToken, $text) {
@@ -200,9 +201,11 @@ function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
     new LINE\LINEBot\MessageBuilder\Imagemap\BaseSizeBuilder(1040, 1040),
     $actionArray
   );
+
   $response = $bot->replyMessage($replyToken, $imagemapMessageBuilder);
   if(!$response->isSucceeded()) {
     error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
   }
 }
+
 ?>
