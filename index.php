@@ -248,6 +248,7 @@ function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
   }
 }
 
+
 //データベースへの接続を管理するクラス
 class dbConnection {
   //インスタンス
@@ -259,7 +260,7 @@ class dbConnection {
       //環境変数からデータベースへの接続情報を取得
       $url = parse_url(getenv('DATEBASE_URL'));
       //データソース
-      $dsn = sprintf('pgsql:host=%s;dbname=%s',$url['host'],substr($url['path'], 1));
+      $dsn = sprintf('pgsql:host=%s;dbname=%s', $url['host'], substr($url['path'], 1));
       //接続を確立
       self::$db = new PDO($dsn, $url['user'], $url['pass']);
       //エラー時例外を投げるように設定
@@ -276,5 +277,4 @@ class dbConnection {
         return self::$db;
     }
   }
-
 ?>
