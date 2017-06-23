@@ -2,7 +2,8 @@
 
 // Composerでインストールしたライブラリを一括読み込み
 require_once __DIR__ . '/vendor/autoload.php';
-
+//テーブル名を定義
+define('TABLE_NAME_STONES', 'stone');
 // アクセストークンを使いCurlHTTPClientをインスタンス化
 $httpClient = new \LINE\LINEBot\HTTPClient\CurlHTTPClient(getenv('CHANNEL_ACCESS_TOKEN'));
 // CurlHTTPClientとシークレットを使いLINEBotをインスタンス化
@@ -37,8 +38,10 @@ foreach ($events as $event) {
     continue;
   }
 
+//ユーザーの情報がデータベースに存在しない時
+if(getStonesByUserId($event->getUserId()) === PDO::PARAM_NULL){
 
-  // ゲーム開始時の石の配置
+// ゲーム開始時の石の配置
       $stones =
       [
       [0, 0, 0, 0, 0, 0, 0, 0],
@@ -50,9 +53,46 @@ foreach ($events as $event) {
       [0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0],
       ];
-
+      //ユーザーをデータベースに登録
+      registerUser($event->getUserId(), json_encode($stones));
+      //Imagemapを返信
+      replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
+      //以降の処理をスキップ
+      continue;
+  //存在する時
+} else {
+  //データベースから現在の石の配置を取得
+  $stones = getStonesByUserId($event->getUserId());
+}
   //imagemapを送信
   replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
+}
+
+//ユーザーをデータベースに登録する
+function registerUser($userId, $stones) {
+  $dbh = dbConnection::getConnection();
+  $sql = 'insert into '. TABLE_NAME_STONES .' (userid, stone) values
+    (pgp_sym_encrypt(?, \'' . getenv(
+    'DB_ENCRYPT_PASS') . '\'), ?) ';
+  $sth = $dbh->prepare($sql);
+  $sth->execute(array($userId, $stones));
+}
+
+//ユーザーIDをもとにデータベースから情報を取得
+function getStonesByUserId($userId){
+  $dbh = dbConnection::getConnection();
+  $sql = 'select stone from ' . TABLE_NAME_STONES . ' where ? =
+   pgp_sym_decrypt(userid, \'' .
+   getenv('DB_ENCRYPT_PASS') . '\')';
+  $sth = $dbh->prepare($sql);
+  $sth->execute(array($userId));
+  //レコードが存在しなければNULL
+  if (!($row = $sth->fetch())){
+    return PDO::PARAM_NULL;
+  } else {
+    //石の配置を連想配列に変換して返す
+    return json_decode($row['stone']);
+  }
 }
 
 // テキストを返信。引数はLINEBot、返信先、テキスト
