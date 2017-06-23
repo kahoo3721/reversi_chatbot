@@ -36,7 +36,7 @@ foreach ($events as $event) {
     error_log('Non text message has come');
     continue;
   }
-  
+
 
   // ゲーム開始時の石の配置
       $stones =
@@ -205,5 +205,4 @@ function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
     error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
   }
 }
-
 ?>
