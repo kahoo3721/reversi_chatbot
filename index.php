@@ -92,7 +92,7 @@ function getStonesByUserId($userId) {
 }
 //そこに置くと相手の石が何個ひっくり返るかを返す
 //引数は現在の配置、行、列、石の色
-function getFlipCountByPosAndColor($stone, $row, $col, $isWhite)
+function getFlipCountByPosAndColor($stones, $row, $col, $isWhite)
 {
   $total = 0;
   //石川見た各方向への行、列の数の差
@@ -278,9 +278,9 @@ function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
       new LINE\LINEBot\ImagemapActionBuilder\AreaBuilder(0, 0, 1, 1)));
       // 全てのマスに対して
       for($i = 0; $i < 8; $i++) {
+        // 石が置かれていない、かつ
+        // そこに置くと相手の石が1つでもひっくり返る場合
         for($j = 0; $j < 8; $j++) {
-          // 石が置かれていない、かつ
-          // そこに置くと相手の石が1つでもひっくり返る場合
           if($stones[$i][$j] == 0 && getFlipCountByPosAndColor($stones, $i, $j, true) > 0) {
             // タップ可能エリアとアクションを作成し配列に追加
             array_push($actionArray, new LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder(
@@ -289,7 +289,7 @@ function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
           }
         }
       }
-      
+
   // ImagemapMessageBuilderの引数は画像のURL、代替テキスト、
   // 基本比率サイズ(幅は1040固定)、アクションの配列
   $imagemapMessageBuilder = new \LINE\LINEBot\MessageBuilder\ImagemapMessageBuilder (
