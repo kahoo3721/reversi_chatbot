@@ -90,6 +90,52 @@ function getStonesByUserId($userId) {
     return json_decode($row['stone']);
   }
 }
+//そこに置くと相手の石が何個ひっくり返るかを返す
+//引数は現在の配置、行、列、石の色
+function getFlipCountByPosAndColor($stone, $row, $col, $isWhite)
+{
+  $total = 0;
+  //石川見た各方向への行、列の数の差
+  $directions = [[-1, 0],[-1, 1],[0, 1],[1, 0],[1, 1],[1, 0],[1, -1],[0, -1],[-1, -1]];
+  //すべての方向をチェック
+  for ($i = 0; $i < count($directions); ++$i) {
+   // 置く場所からの距離。1つずつ進めながらチェックしていく
+   $cnt = 1;
+   // 行の距離
+   $rowDiff = $directions[$i][0];
+   // 列の距離
+   $colDiff = $directions[$i][1];
+   // はさめる可能性がある数
+   $flipCount = 0;
+
+   while (true) {
+     // 盤面の外に出たらループを抜ける
+     if (!isset($stones[$row + $rowDiff * $cnt]) || !isset($stones[$row + $rowDiff * $cnt][$col + $colDiff * $cnt])) {
+       $flipCount = 0;
+       break;
+     }
+     // 相手の石なら$flipCountを加算
+     if ($stones[$row + $rowDiff * $cnt][$col + $colDiff * $cnt] == ($isWhite ? 2 : 1)) {
+       $flipCount++;
+     }
+     // 自分の石ならループを抜ける
+     elseif ($stones[$row + $rowDiff * $cnt][$col + $colDiff * $cnt] == ($isWhite ? 1 : 2)) {
+       break;
+     }
+     // どちらの石も置かれてなければループを抜ける
+     elseif ($stones[$row + $rowDiff * $cnt][$col + $colDiff * $cnt] == 0) {
+       $flipCount = 0;
+       break;
+     }
+     // 1個進める
+     $cnt++;
+   }
+   // 加算
+   $total += $flipCount;
+ }
+ // ひっくり返る総数を返す
+ return $total;
+}
 
 
 // テキストを返信。引数はLINEBot、返信先、テキスト
@@ -230,6 +276,20 @@ function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
   array_push($actionArray, new LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder(
       '-',
       new LINE\LINEBot\ImagemapActionBuilder\AreaBuilder(0, 0, 1, 1)));
+      // 全てのマスに対して
+      for($i = 0; $i < 8; $i++) {
+        for($j = 0; $j < 8; $j++) {
+          // 石が置かれていない、かつ
+          // そこに置くと相手の石が1つでもひっくり返る場合
+          if($stones[$i][$j] == 0 && getFlipCountByPosAndColor($stones, $i, $j, true) > 0) {
+            // タップ可能エリアとアクションを作成し配列に追加
+            array_push($actionArray, new LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder(
+                '[' . ($i + 1) . ',' . ($j + 1) . ']',
+                new LINE\LINEBot\ImagemapActionBuilder\AreaBuilder(130 * $j, 130 * $i, 130, 130)));
+          }
+        }
+      }
+      
   // ImagemapMessageBuilderの引数は画像のURL、代替テキスト、
   // 基本比率サイズ(幅は1040固定)、アクションの配列
   $imagemapMessageBuilder = new \LINE\LINEBot\MessageBuilder\ImagemapMessageBuilder (
