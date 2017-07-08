@@ -86,7 +86,7 @@ foreach ($events as $event) {
     }
     // 遊び方
     else if(substr($event->getText(), 4) == 'help') {
-      replyTextMessage($bot, $event->getReplyToken(), '[遊び方]きみは常に白です！送られたボード上の置きたい場所をタップしてね！バグった時はオプションの盤面再送から！');
+      replyTextMessage($bot, $event->getReplyToken(), '[遊び方]きみは常に白です！送られたボード上の置きたい場所をタップしてね！バグった時はオプションのボード再送から！');
     }
     continue;
   }
