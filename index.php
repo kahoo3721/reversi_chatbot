@@ -208,7 +208,7 @@ function endGame($bot, $replyToken, $userId, $stones) {
   if($white == $black) {
     $message = '引き分け！' . sprintf('白 : %d、 黒 %d', $white, $black);
   } else {
-    $message = ($white > $black ? 'あなた' : 'CPU') . 'の勝ち！' . sprintf('白 : %d、 黒 : %d', $white, $black);
+    $message = ($white > $black ? 'きみ' : 'CPU') . 'の勝ち！' . sprintf('白 : %d、 黒 : %d', $white, $black);
   }
 
   // 盤面とダミーエリアのみのImagemapを生成
