@@ -32,9 +32,63 @@ foreach ($events as $event) {
     error_log('Non message event has come');
     continue;
   }
+
   // TextMessageクラスのインスタンスでなければ処理をスキップ
   if (!($event instanceof \LINE\LINEBot\Event\MessageEvent\TextMessage)) {
     error_log('Non text message has come');
+    continue;
+  }
+  // リッチコンテンツがタップされた時
+ if(substr($event->getText(), 0, 4) == 'cmd_') {
+   // 盤面の確認
+   if(substr($event->getText(), 4) == 'check_board') {
+     if(getStonesByUserId($event->getUserId()) != PDO::PARAM_NULL) {
+       $stones = getStonesByUserId($event->getUserId());
+       replyImagemap($bot, $event->getReplyToken(), '盤面',  $stones);
+     }
+   }
+
+   // 情勢の確認
+   else if(substr($event->getText(), 4) == 'check_count') {
+     if(getStonesByUserId($event->getUserId()) != PDO::PARAM_NULL) {
+       $stones = getStonesByUserId($event->getUserId());
+       $white = 0;
+       $black = 0;
+       for($i = 0; $i < count($stones); $i++) {
+         for($j = 0; $j < count($stones[$i]); $j++) {
+           if($stones[$i][$j] == 1) {
+             $white++;
+           } else if($stones[$i][$j] == 2) {
+             $black++;
+           }
+         }
+       }
+
+       replyTextMessage($bot, $event->getReplyToken(), sprintf('白 : %d、黒 : %d', $white, $black));
+      }
+    }
+    // ゲームを中断し新ゲームを開始
+    else if(substr($event->getText(), 4) == 'newgame') {
+      deleteUser($event->getUserId());
+      $stones =
+      [
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 2, 0, 0, 0],
+      [0, 0, 0, 2, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      ];
+      registerUser($event->getUserId(), json_encode($stones));
+
+      replyImagemap($bot, $event->getReplyToken(), '盤面', $stones, null);
+    }
+    // 遊び方
+    else if(substr($event->getText(), 4) == 'help') {
+      replyTextMessage($bot, $event->getReplyToken(), 'あなたは常に白です。送られた盤面上の置きたい場所をタップ！バグった時はオプションの盤面再送から！');
+    }
     continue;
   }
 
@@ -76,6 +130,25 @@ if(getStonesByUserId($event->getUserId()) === PDO::PARAM_NULL) {
     // ユーザーの情報を更新
     updateUser($event->getUserId(), json_encode($stones));
 
+    // ユーザーも相手も石を置くことができない時
+      if(!getCanPlaceByColor($stones, true) && !getCanPlaceByColor($stones, false)) {
+        // ゲームオーバー
+        endGame($bot, $event->getReplyToken(), $event->getUserId(), $stones);
+        continue;
+      // 相手のみが置ける時
+      } else if(!getCanPlaceByColor($stones, true) && getCanPlaceByColor($stones, false)) {
+        // ユーザーが置けるようになるまで相手が石を置く
+        while(!getCanPlaceByColor($stones, true)) {
+          placeAIStone();
+          updateUser($bot, json_encode($stones));
+          // どちらの石も置けなくなったらゲームオーバー
+          if(!getCanPlaceByColor($stones, true) && !getCanPlaceByColor($stones, false)) {
+            endGame($bot, $event->getReplyToken(), $event->getUserId(), $stones);
+            continue 2;
+          }
+        }
+      }
+
     //imagemapを送信
     replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
  }
@@ -96,6 +169,14 @@ function updateUser($userId, $stones) {
   $sth->execute(array($stones, $userId));
 }
 
+// ユーザーの情報をデータベースから削除
+function deleteUser($userId) {
+  $dbh = dbConnection::getConnection();
+  $sql = 'delete FROM ' . TABLE_NAME_STONES . ' where ? = pgp_sym_decrypt(userid, \'' . getenv('DB_ENCRYPT_PASS') . '\')';
+  $sth = $dbh->prepare($sql);
+  $flag = $sth->execute(array($userId));
+}
+
 // ユーザーIDを元にデータベースから情報を取得
 function getStonesByUserId($userId) {
   $dbh = dbConnection::getConnection();
@@ -109,6 +190,68 @@ function getStonesByUserId($userId) {
     // 石の配置を連想配列に変換し返す
     return json_decode($row['stone']);
   }
+}
+// ゲームオーバー
+function endGame($bot, $replyToken, $userId, $stones) {
+  // それぞれの石の数をカウント
+  $white = 0;
+  $black = 0;
+  for($i = 0; $i < count($stones); $i++) {
+    for($j = 0; $j < count($stones[$i]); $j++) {
+      if($stones[$i][$j] == 1) {
+        $white++;
+      } else if($stones[$i][$j] == 2) {
+        $black++;
+      }
+    }
+  }
+
+  // 送るテキスト
+  if($white == $black) {
+    $message = '引き分け！' . sprintf('白 : %d、 黒 %d', $white, $black);
+  } else {
+    $message = ($white > $black ? 'あなた' : 'CPU') . 'の勝ち！' . sprintf('白 : %d、 黒 : %d', $white, $black);
+  }
+
+  // 盤面とダミーエリアのみのImagemapを生成
+  $actionArray = array();
+  array_push($actionArray, new LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder(
+    '-',
+    new LINE\LINEBot\ImagemapActionBuilder\AreaBuilder(0, 0, 1, 1)));
+
+  $imagemapMessageBuilder = new \LINE\LINEBot\MessageBuilder\ImagemapMessageBuilder (
+    'https://' . $_SERVER['HTTP_HOST'] .  '/images/' . urlencode(json_encode($stones) . '/' . uniqid()),
+    $message,
+    new LINE\LINEBot\MessageBuilder\Imagemap\BaseSizeBuilder(1040, 1040),
+    $actionArray
+  );
+
+  // テキストのメッセージ
+  $textMessage = new \LINE\LINEBot\MessageBuilder\TextMessageBuilder($message);
+  // スタンプのメッセージ
+  $stickerMessage = ($white >= $black)
+    ? new \LINE\LINEBot\MessageBuilder\StickerMessageBuilder(1, 114)
+    : new \LINE\LINEBot\MessageBuilder\StickerMessageBuilder(1, 111);
+  // データベースからユーザーを削除
+  deleteUser($userId);
+  // Imagemap、テキスト、スタンプを返信
+  replyMultiMessage($bot, $replyToken, $imagemapMessageBuilder, $textMessage, $stickerMessage);
+}
+
+// 石が置ける場所があるかを調べる
+// 引数は現在の石の配置、石の色
+function getCanPlaceByColor($stones, $isWhite) {
+  for ($i = 0; $i < count($stones); $i++) {
+    for ($j = 0; $j < count($stones[$i]); $j++) {
+      if ($stones[$i][$j] == 0) {
+        // 1つでもひっくり返るなら真
+        if (getFlipCountByPosAndColor($stones, $i, $j, $isWhite) > 0) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 // そこに置くと相手の石が何個ひっくり返るかを返す
