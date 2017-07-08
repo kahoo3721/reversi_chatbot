@@ -10,6 +10,7 @@ $destinationImage = imagecreatefrompng('imgs/reversi_board.png');
 
 // パラメータから現在の石の配置を取得
 $stones = json_decode(explode('|', $_REQUEST['stones'])[0]);
+
 // パラメータから前ターンの石の配置を取得
 $lastStones = json_decode(explode('|', $_REQUEST['stones'])[1]);
 
@@ -60,6 +61,7 @@ if(file_exists('./tmp/' . $lastStoneCount . '/' . json_encode($lastStones) . '.p
     }
   }
 }
+
 // 前ターンの画像が存在しない時
 else {
   for($i = 0; $i < count($stones); $i++) {

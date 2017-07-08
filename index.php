@@ -2,8 +2,9 @@
 
 // Composerでインストールしたライブラリを一括読み込み
 require_once __DIR__ . '/vendor/autoload.php';
-//テーブル名を定義
+// テーブル名を定義
 define('TABLE_NAME_STONES', 'stones');
+
 // アクセストークンを使いCurlHTTPClientをインスタンス化
 $httpClient = new \LINE\LINEBot\HTTPClient\CurlHTTPClient(getenv('CHANNEL_ACCESS_TOKEN'));
 // CurlHTTPClientとシークレットを使いLINEBotをインスタンス化
@@ -27,44 +28,42 @@ try {
 
 // 配列に格納された各イベントをループで処理
 foreach ($events as $event) {
-  // MessageEventクラスのインスタンスでなければ処理をスキップ
+  // MessageEvent型でなければ処理をスキップ
   if (!($event instanceof \LINE\LINEBot\Event\MessageEvent)) {
     error_log('Non message event has come');
     continue;
   }
-
-  // TextMessageクラスのインスタンスでなければ処理をスキップ
+  // TextMessage型でなければ処理をスキップ
   if (!($event instanceof \LINE\LINEBot\Event\MessageEvent\TextMessage)) {
     error_log('Non text message has come');
     continue;
   }
+
   // リッチコンテンツがタップされた時
- if(substr($event->getText(), 0, 4) == 'cmd_') {
-   // 盤面の確認
-   if(substr($event->getText(), 4) == 'check_board') {
-     if(getStonesByUserId($event->getUserId()) != PDO::PARAM_NULL) {
-       $stones = getStonesByUserId($event->getUserId());
-       replyImagemap($bot, $event->getReplyToken(), '盤面',  $stones);
-     }
-   }
-
-   // 情勢の確認
-   else if(substr($event->getText(), 4) == 'check_count') {
-     if(getStonesByUserId($event->getUserId()) != PDO::PARAM_NULL) {
-       $stones = getStonesByUserId($event->getUserId());
-       $white = 0;
-       $black = 0;
-       for($i = 0; $i < count($stones); $i++) {
-         for($j = 0; $j < count($stones[$i]); $j++) {
-           if($stones[$i][$j] == 1) {
-             $white++;
-           } else if($stones[$i][$j] == 2) {
-             $black++;
-           }
-         }
-       }
-
-       replyTextMessage($bot, $event->getReplyToken(), sprintf('白 : %d、黒 : %d', $white, $black));
+  if(substr($event->getText(), 0, 4) == 'cmd_') {
+    // 盤面の確認
+    if(substr($event->getText(), 4) == 'check_board') {
+      if(getStonesByUserId($event->getUserId()) != PDO::PARAM_NULL) {
+        $stones = getStonesByUserId($event->getUserId());
+        replyImagemap($bot, $event->getReplyToken(), '盤面',  $stones);
+      }
+    }
+    // 情勢の確認
+    else if(substr($event->getText(), 4) == 'check_count') {
+      if(getStonesByUserId($event->getUserId()) != PDO::PARAM_NULL) {
+        $stones = getStonesByUserId($event->getUserId());
+        $white = 0;
+        $black = 0;
+        for($i = 0; $i < count($stones); $i++) {
+          for($j = 0; $j < count($stones[$i]); $j++) {
+            if($stones[$i][$j] == 1) {
+              $white++;
+            } else if($stones[$i][$j] == 2) {
+              $black++;
+            }
+          }
+        }
+        replyTextMessage($bot, $event->getReplyToken(), sprintf('白 : %d、黒 : %d', $white, $black));
       }
     }
     // ゲームを中断し新ゲームを開始
@@ -87,73 +86,71 @@ foreach ($events as $event) {
     }
     // 遊び方
     else if(substr($event->getText(), 4) == 'help') {
-      replyTextMessage($bot, $event->getReplyToken(), 'あなたは常に白です。送られた盤面上の置きたい場所をタップ！バグった時はオプションの盤面再送から！');
+      replyTextMessage($bot, $event->getReplyToken(), '[遊び方]きみは常に白です！送られたボード上の置きたい場所をタップしてね！バグった時はオプションの盤面再送から！');
     }
     continue;
   }
 
-//ユーザーの情報がデータベースに存在しない時
-if(getStonesByUserId($event->getUserId()) === PDO::PARAM_NULL) {
+  // ユーザーの情報がデータベースに存在しない時
+  if(getStonesByUserId($event->getUserId()) === PDO::PARAM_NULL) {
+    // ゲーム開始時の石の配置
+    $stones =
+    [
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 1, 2, 0, 0, 0],
+    [0, 0, 0, 2, 1, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    // ユーザーをデータベースに登録
+    registerUser($event->getUserId(), json_encode($stones));
+    // Imagemapを返信
+    replyImagemap($bot, $event->getReplyToken(), '盤面', $stones, null);
+    // 以降の処理をスキップ
+    continue;
+  // 存在する時
+  } else {
+    // データベースから現在の石の配置を取得
+    $stones = getStonesByUserId($event->getUserId());
+    $lastStones = $stones;
+  }
 
-// ゲーム開始時の石の配置
-      $stones =
-      [
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 1, 2, 0, 0, 0],
-      [0, 0, 0, 2, 1, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      ];
-      // ユーザーをデータベースに登録
-      registerUser($event->getUserId(), json_encode($stones));
-      // Imagemapを返信
-      replyImagemap($bot, $event->getReplyToken(), '盤面', $stones, null);
-      // 以降の処理をスキップ
-      continue;
-    // 存在する時
-    } else {
-      // データベースから現在の石の配置を取得
-      $stones = getStonesByUserId($event->getUserId());
-    }
-    //入力されたテキストを[行、列]の配列に変換
-    $tappedArea = json_decode($event->getText());
+  // 入力されたテキストを[行,列]の配列に変換
+  $tappedArea = json_decode($event->getText());
 
-    // ユーザーの石を置く
-    placeStone($stones, $tappedArea[0] - 1, $tappedArea[1] - 1, true);
+  // ユーザーの石を置く
+  placeStone($stones, $tappedArea[0] - 1, $tappedArea[1] - 1, true);
+  // 相手の石を置く
+  placeAIStone($stones);
+  // ユーザーの情報を更新
+  updateUser($event->getUserId(), json_encode($stones));
 
-    // 相手の石を置く
-    placeAIStone($stones);
-
-    // ユーザーの情報を更新
-    updateUser($event->getUserId(), json_encode($stones));
-
-    // ユーザーも相手も石を置くことができない時
+  // ユーザーも相手も石を置くことができない時
+  if(!getCanPlaceByColor($stones, true) && !getCanPlaceByColor($stones, false)) {
+    // ゲームオーバー
+    endGame($bot, $event->getReplyToken(), $event->getUserId(), $stones);
+    continue;
+  // 相手のみが置ける時
+  } else if(!getCanPlaceByColor($stones, true) && getCanPlaceByColor($stones, false)) {
+    // ユーザーが置けるようになるまで相手が石を置く
+    while(!getCanPlaceByColor($stones, true)) {
+      placeAIStone();
+      updateUser($bot, json_encode($stones));
+      // どちらの石も置けなくなったらゲームオーバー
       if(!getCanPlaceByColor($stones, true) && !getCanPlaceByColor($stones, false)) {
-        // ゲームオーバー
         endGame($bot, $event->getReplyToken(), $event->getUserId(), $stones);
-        continue;
-      // 相手のみが置ける時
-      } else if(!getCanPlaceByColor($stones, true) && getCanPlaceByColor($stones, false)) {
-        // ユーザーが置けるようになるまで相手が石を置く
-        while(!getCanPlaceByColor($stones, true)) {
-          placeAIStone();
-          updateUser($bot, json_encode($stones));
-          // どちらの石も置けなくなったらゲームオーバー
-          if(!getCanPlaceByColor($stones, true) && !getCanPlaceByColor($stones, false)) {
-            endGame($bot, $event->getReplyToken(), $event->getUserId(), $stones);
-            continue 2;
-          }
-        }
+        continue 2;
       }
+    }
+  }
 
-    //imagemapを送信
-    replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
- }
+  replyImagemap($bot, $event->getReplyToken(), '盤面', $stones, $lastStones);
+}
 
-/// ユーザーをデータベースに登録する
+// ユーザーをデータベースに登録する
 function registerUser($userId, $stones) {
   $dbh = dbConnection::getConnection();
   $sql = 'insert into '. TABLE_NAME_STONES .' (userid, stone) values (pgp_sym_encrypt(?, \'' . getenv('DB_ENCRYPT_PASS') . '\'), ?) ';
@@ -191,6 +188,7 @@ function getStonesByUserId($userId) {
     return json_decode($row['stone']);
   }
 }
+
 // ゲームオーバー
 function endGame($bot, $replyToken, $userId, $stones) {
   // それぞれの石の数をカウント
@@ -301,6 +299,7 @@ function getFlipCountByPosAndColor($stones, $row, $col, $isWhite)
   // ひっくり返る総数を返す
   return $total;
 }
+
 // 石を置く。石の配置は参照渡し
 function placeStone(&$stones, $row, $col, $isWhite) {
   // ひっくり返す。処理の流れは
@@ -503,31 +502,30 @@ function replyCarouselTemplate($bot, $replyToken, $alternativeText, $columnArray
 }
 
 // 盤面のImagemapを返信
-function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
+function replyImagemap($bot, $replyToken, $alternativeText, $stones, $lastStones) {
   // アクションの配列
   $actionArray = array();
   // 1つ以上のエリアが必要なためダミーのタップ可能エリアを追加
   array_push($actionArray, new LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder(
       '-',
       new LINE\LINEBot\ImagemapActionBuilder\AreaBuilder(0, 0, 1, 1)));
-      // 全てのマスに対して
-      for($i = 0; $i < 8; $i++) {
-        // 石が置かれていない、かつ
-        // そこに置くと相手の石が1つでもひっくり返る場合
-        for($j = 0; $j < 8; $j++) {
-          if($stones[$i][$j] == 0 && getFlipCountByPosAndColor($stones, $i, $j, true) > 0) {
-            // タップ可能エリアとアクションを作成し配列に追加
-            array_push($actionArray, new LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder(
-                '[' . ($i + 1) . ',' . ($j + 1) . ']',
-                new LINE\LINEBot\ImagemapActionBuilder\AreaBuilder(130 * $j, 130 * $i, 130, 130)));
-          }
-        }
+  // 全てのマスに対して
+  for($i = 0; $i < 8; $i++) {
+    for($j = 0; $j < 8; $j++) {
+      // 石が置かれていない、かつ
+      // そこに置くと相手の石が1つでもひっくり返る場合
+      if($stones[$i][$j] == 0 && getFlipCountByPosAndColor($stones, $i, $j, true) > 0) {
+        // タップ可能エリアとアクションを作成し配列に追加
+        array_push($actionArray, new LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder(
+            '[' . ($i + 1) . ',' . ($j + 1) . ']',
+            new LINE\LINEBot\ImagemapActionBuilder\AreaBuilder(130 * $j, 130 * $i, 130, 130)));
       }
-
+    }
+  }
   // ImagemapMessageBuilderの引数は画像のURL、代替テキスト、
   // 基本比率サイズ(幅は1040固定)、アクションの配列
   $imagemapMessageBuilder = new \LINE\LINEBot\MessageBuilder\ImagemapMessageBuilder (
-    'https://' . $_SERVER['HTTP_HOST'] . '/images/' . urlencode(json_encode($stones))  . '/' . uniqid(),
+    'https://' . $_SERVER['HTTP_HOST'] . '/images/' . urlencode(json_encode($stones) . '|' . json_encode($lastStones)) . '/' . uniqid(),
     $alternativeText,
     new LINE\LINEBot\MessageBuilder\Imagemap\BaseSizeBuilder(1040, 1040),
     $actionArray
@@ -538,7 +536,6 @@ function replyImagemap($bot, $replyToken, $alternativeText, $stones) {
     error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
   }
 }
-
 
 // データベースへの接続を管理するクラス
 class dbConnection {
@@ -570,4 +567,5 @@ class dbConnection {
     return self::$db;
   }
 }
+
 ?>
